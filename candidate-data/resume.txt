@@ -1,0 +1,25 @@
+ALEX JOHNSON
+alex.johnson@university.edu | +1-555-0123
+
+EDUCATION
+State University of Technology
+BS Computer Science, GPA: 3.8
+Expected Graduation: May 2025
+
+EXPERIENCE
+ML Research Assistant | University AI Lab | Jan 2024 - Present
+- Developed NLP models for text classification using transformer architectures
+- Published 1 paper on efficient fine-tuning of large language models
+- Collaborated with 3 researchers on multi-modal AI systems
+
+PROJECTS
+Autonomous Code Review Bot
+- Built an LLM-powered code review bot using Python and GPT-4 API
+- Integrated with GitHub API for automated pull request analysis
+- Achieved 85% accuracy in identifying code quality issues
+
+SKILLS
+Languages: Python, Java, JavaScript, SQL
+Frameworks: Spring Boot, React, TensorFlow, PyTorch
+Tools: Git, Docker, AWS, Linux
+Areas: Machine Learning, NLP, Computer Vision, Distributed Systems

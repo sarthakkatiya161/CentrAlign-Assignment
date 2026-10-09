@@ -1,0 +1,26 @@
+{
+  "name": "Alex Johnson",
+  "email": "alex.johnson@university.edu",
+  "phone": "+1-555-0123",
+  "university": "State University of Technology",
+  "degree": "BS",
+  "major": "Computer Science",
+  "gpa": "3.8",
+  "graduation_year": "2025",
+  "skills": ["Python", "Java", "Machine Learning", "NLP", "Spring Boot", "React"],
+  "experience": [
+    {
+      "title": "ML Research Assistant",
+      "organization": "University AI Lab",
+      "duration": "Jan 2024 - Present",
+      "description": "Developed NLP models for text classification. Published 1 paper on transformer architectures."
+    }
+  ],
+  "projects": [
+    {
+      "name": "Autonomous Code Review Bot",
+      "description": "Built an LLM-powered code review bot that analyzes pull requests and suggests improvements.",
+      "technologies": ["Python", "GPT-4", "GitHub API"]
+    }
+  ]
+}

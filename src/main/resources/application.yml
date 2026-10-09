@@ -1,0 +1,32 @@
+spring:
+  config:
+    import: optional:file:.env[.properties]
+  datasource:
+    url: jdbc:sqlite:taskpilot.db
+    driver-class-name: org.sqlite.JDBC
+  sql:
+    init:
+      mode: never
+
+taskpilot:
+  llm:
+    provider: ${LLM_PROVIDER:gemini}
+    api-key: ${LLM_API_KEY:YYYYYYY}
+    model: ${LLM_MODEL:gemini-2.5-flash}
+    max-tokens: ${LLM_MAX_TOKENS:8192}
+  agent:
+    max-steps: 40
+    max-replans: 3
+    max-retries-per-action: 2
+    max-llm-retries: 2
+    max-verify-cycles: 2
+  sim:
+    company-portal-url: ${SIM_COMPANY_URL:http://localhost:3001}
+    mock-mail-url: ${SIM_MAIL_URL:http://localhost:3002}
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.taskpilot: DEBUG

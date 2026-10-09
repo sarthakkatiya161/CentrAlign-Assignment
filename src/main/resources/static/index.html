@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TaskPilot — Autonomous AI Task Worker</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+  .header { background: #1a1d27; border-bottom: 1px solid #2d3748; padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+  .header h1 { font-size: 20px; font-weight: 700; color: #63b3ed; }
+  .header .badge { font-size: 11px; background: #2d3748; padding: 3px 8px; border-radius: 12px; color: #a0aec0; }
+  .main { display: grid; grid-template-columns: 420px 1fr; gap: 0; height: calc(100vh - 57px); }
+  .sidebar { background: #1a1d27; border-right: 1px solid #2d3748; overflow-y: auto; display: flex; flex-direction: column; }
+  .sidebar-section { padding: 20px; border-bottom: 1px solid #2d3748; }
+  .sidebar-section h3 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #718096; margin-bottom: 12px; }
+  textarea { width: 100%; background: #2d3748; border: 1px solid #4a5568; border-radius: 8px; color: #e2e8f0; padding: 12px; font-size: 14px; resize: vertical; min-height: 100px; line-height: 1.5; }
+  textarea:focus { outline: none; border-color: #63b3ed; }
+  .btn { width: 100%; padding: 10px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+  .btn-primary { background: #3182ce; color: white; }
+  .btn-primary:hover { background: #2b6cb0; }
+  .btn-danger { background: #e53e3e; color: white; margin-top: 8px; }
+  .btn-danger:hover { background: #c53030; }
+  .btn-success { background: #38a169; color: white; }
+  .btn-success:hover { background: #2f855a; }
+  .btn-edit { background: #d69e2e; color: white; }
+  .btn-reject { background: #e53e3e; color: white; }
+  .task-list { flex: 1; overflow-y: auto; }
+  .task-item { padding: 12px 20px; cursor: pointer; border-bottom: 1px solid #2d3748; transition: background 0.15s; }
+  .task-item:hover { background: #2d3748; }
+  .task-item.active { background: #2a4365; border-left: 3px solid #63b3ed; }
+  .task-item .task-req { font-size: 13px; color: #e2e8f0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .task-item .task-meta { font-size: 11px; color: #718096; margin-top: 4px; display: flex; gap: 8px; }
+  .status-badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .status-CREATED { background: #2d3748; color: #a0aec0; }
+  .status-ANALYZING { background: #1a365d; color: #63b3ed; }
+  .status-RUNNING { background: #1c4532; color: #68d391; }
+  .status-WAITING_APPROVAL { background: #744210; color: #f6ad55; }
+  .status-WAITING_INPUT { background: #44337a; color: #b794f4; }
+  .status-VERIFYING { background: #1a3a5c; color: #90cdf4; }
+  .status-COMPLETED { background: #1c4532; color: #68d391; }
+  .status-FAILED { background: #742a2a; color: #fc8181; }
+  .status-CANCELLED { background: #2d3748; color: #718096; }
+  .content { overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: #718096; gap: 12px; }
+  .empty-state svg { width: 64px; height: 64px; opacity: 0.3; }
+  .card { background: #1a1d27; border: 1px solid #2d3748; border-radius: 12px; overflow: hidden; }
+  .card-header { padding: 14px 20px; border-bottom: 1px solid #2d3748; display: flex; align-items: center; justify-content: space-between; }
+  .card-header h2 { font-size: 15px; font-weight: 600; }
+  .card-body { padding: 20px; }
+  .fact-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .fact-item { background: #2d3748; border-radius: 6px; padding: 8px 12px; }
+  .fact-key { font-size: 11px; color: #718096; }
+  .fact-val { font-size: 13px; color: #e2e8f0; margin-top: 2px; word-break: break-all; }
+  .feed { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; padding: 4px; }
+  .feed-item { display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border-radius: 8px; background: #2d3748; }
+  .feed-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .feed-content { flex: 1; min-width: 0; }
+  .feed-type { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .feed-msg { font-size: 13px; color: #cbd5e0; margin-top: 2px; word-break: break-word; }
+  .feed-item.FAILED .feed-type, .feed-item.RECOVERY .feed-type { color: #fc8181; }
+  .feed-item.COMPLETED .feed-type { color: #68d391; }
+  .feed-item.WAITING_APPROVAL .feed-type { color: #f6ad55; }
+  .feed-item.PLANNING .feed-type { color: #63b3ed; }
+  .feed-item.VERIFYING .feed-type { color: #90cdf4; }
+  .approval-card { background: #2d3748; border: 1px solid #f6ad55; border-radius: 10px; padding: 16px; }
+  .approval-title { color: #f6ad55; font-weight: 600; font-size: 14px; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .approval-digest { font-family: monospace; font-size: 12px; background: #1a1d27; padding: 10px 12px; border-radius: 6px; color: #cbd5e0; word-break: break-all; margin-bottom: 12px; }
+  .approval-buttons { display: flex; gap: 8px; }
+  .approval-buttons button { flex: 1; padding: 8px; border: none; border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.2s; }
+  .approval-buttons button:hover { opacity: 0.85; }
+  .input-card { background: #2d3748; border: 1px solid #b794f4; border-radius: 10px; padding: 16px; }
+  .input-title { color: #b794f4; font-weight: 600; font-size: 14px; margin-bottom: 12px; }
+  .input-card input { width: 100%; background: #1a1d27; border: 1px solid #4a5568; border-radius: 6px; color: #e2e8f0; padding: 10px 12px; font-size: 14px; margin-bottom: 10px; }
+  .input-card input:focus { outline: none; border-color: #b794f4; }
+  .verify-list { display: flex; flex-direction: column; gap: 8px; }
+  .verify-item { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: #2d3748; border-radius: 8px; }
+  .verify-icon { font-size: 18px; flex-shrink: 0; }
+  .verify-desc { font-size: 13px; color: #e2e8f0; }
+  .verify-detail { font-size: 12px; color: #718096; margin-top: 3px; }
+  .evidence-list { display: flex; flex-direction: column; gap: 6px; }
+  .evidence-item { font-size: 12px; font-family: monospace; background: #2d3748; padding: 6px 10px; border-radius: 6px; color: #90cdf4; word-break: break-all; }
+  .spinner { width: 16px; height: 16px; border: 2px solid #2d3748; border-top: 2px solid #63b3ed; border-radius: 50%; animation: spin 0.8s linear infinite; display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .mt-8 { margin-top: 8px; }
+  .quick-tasks { display: flex; flex-direction: column; gap: 6px; }
+  .quick-task { background: #2d3748; border: 1px solid #4a5568; border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 12px; color: #a0aec0; transition: all 0.15s; text-align: left; }
+  .quick-task:hover { border-color: #63b3ed; color: #63b3ed; background: #1a2d4a; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚡ TaskPilot</h1>
+  <span class="badge">General Autonomous AI Task Worker</span>
+</div>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <h3>New Task</h3>
+      <textarea id="taskInput" placeholder="Enter a natural-language task...
+Examples:
+• Apply for the AI Engineering Intern role at TechCorp
+• Find the latest recruiter email and prepare a reply
+• Find the invoice in my email and enter it into the internal system"></textarea>
+      <button class="btn btn-primary mt-8" onclick="startTask()">▶ Start Task</button>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>Quick Tasks</h3>
+      <div class="quick-tasks">
+        <button class="quick-task" onclick="setTask('Apply for the AI Engineering Intern role at TechCorp')">🎓 Apply for AI Engineering Intern at TechCorp</button>
+        <button class="quick-task" onclick="setTask('Find the latest recruiter email about internship opportunities and prepare a professional reply')">📧 Reply to recruiter email</button>
+        <button class="quick-task" onclick="setTask('Find the latest invoice in my email and enter the details into the TechCorp internal system')">🧾 Process invoice from email</button>
+        <button class="quick-task" onclick="setTask('Find the due date in the latest invoice and email it to finance@techcorp.com')">📤 Email invoice details to finance</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section" style="flex:1;">
+      <h3>Tasks</h3>
+      <div class="task-list" id="taskList"></div>
+    </div>
+  </div>
+
+  <!-- CONTENT PANEL -->
+  <div class="content" id="content">
+    <div class="empty-state">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+      </svg>
+      <p>Create a task to see it running here</p>
+    </div>
+  </div>
+</div>
+
+<script>
+let selectedTaskId = null;
+let eventSource = null;
+let tasks = {};
+
+// ── Quick task button ─────────────────────────────────────
+function setTask(text) {
+  document.getElementById('taskInput').value = text;
+}
+
+// ── Start task ────────────────────────────────────────────
+async function startTask() {
+  const request = document.getElementById('taskInput').value.trim();
+  if (!request) return alert('Please enter a task');
+  const res = await api('POST', '/api/tasks', { request });
+  if (res) {
+    document.getElementById('taskInput').value = '';
+    selectTask(res.id);
+    await loadTasks();
+  }
+}
+
+// ── Cancel task ───────────────────────────────────────────
+async function cancelTask(id) {
+  if (!confirm('Cancel this task?')) return;
+  await api('POST', `/api/tasks/${id}/cancel`);
+  await refreshTask(id);
+}
+
+// ── Approval ──────────────────────────────────────────────
+async function decide(taskId, approvalId, decision, editedPayload) {
+  const body = { decision };
+  if (editedPayload) body.editedPayload = editedPayload;
+  await api('POST', `/api/tasks/${taskId}/approvals/${approvalId}`, body);
+  await refreshTask(taskId);
+}
+
+// ── Input ─────────────────────────────────────────────────
+async function submitInput(taskId) {
+  const val = document.getElementById('userInput').value.trim();
+  if (!val) return alert('Please enter a response');
+  await api('POST', `/api/tasks/${taskId}/input`, { answer: val });
+  await refreshTask(taskId);
+}
+
+// ── Select & render task ──────────────────────────────────
+function selectTask(id) {
+  selectedTaskId = id;
+  document.querySelectorAll('.task-item').forEach(el => el.classList.remove('active'));
+  document.querySelector(`[data-id="${id}"]`)?.classList.add('active');
+  connectSSE(id);
+  renderTaskDetail(id);
+}
+
+// ── SSE ───────────────────────────────────────────────────
+function connectSSE(taskId) {
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource(`/api/tasks/${taskId}/events`);
+  eventSource.addEventListener('step', async (e) => {
+    const data = JSON.parse(e.data);
+    appendFeedItem(data.type, data.message);
+    await refreshTask(taskId);
+  });
+  eventSource.onerror = () => eventSource.close();
+}
+
+function appendFeedItem(type, message) {
+  const feed = document.getElementById('stepFeed');
+  if (!feed) return;
+  const icons = { PLANNING:'🤔', EXECUTING:'⚙️', OBSERVATION:'👁️', RECOVERY:'🔄',
+                  WAITING_APPROVAL:'⏳', WAITING_INPUT:'❓', VERIFYING:'✅',
+                  COMPLETED:'🎉', FAILED:'❌', ANALYZING:'🔍', FINISHING:'🏁',
+                  VERIFY_FAIL:'⚠️', CLARIFICATION_NEEDED:'❓' };
+  const div = document.createElement('div');
+  div.className = `feed-item ${type}`;
+  div.innerHTML = `<span class="feed-icon">${icons[type]||'📌'}</span>
+    <div class="feed-content">
+      <div class="feed-type">${type}</div>
+      <div class="feed-msg">${escHtml(message)}</div>
+    </div>`;
+  feed.appendChild(div);
+  feed.scrollTop = feed.scrollHeight;
+}
+
+// ── Render task detail ─────────────────────────────────────
+async function renderTaskDetail(taskId) {
+  const task = await api('GET', `/api/tasks/${taskId}`);
+  if (!task) return;
+  tasks[taskId] = task;
+
+  const isRunning = ['CREATED','ANALYZING','RUNNING','VERIFYING'].includes(task.status);
+  const content = document.getElementById('content');
+
+  // Approval card if needed
+  let approvalHtml = '';
+  if (task.status === 'WAITING_APPROVAL') {
+    const pending = await api('GET', `/api/tasks/${taskId}/approvals/pending`).catch(()=>null);
+    if (pending) {
+      approvalHtml = `
+        <div class="card">
+          <div class="card-header"><h2>⏳ Approval Required</h2></div>
+          <div class="card-body">
+            <div class="approval-card">
+              <div class="approval-title">⚠️ This action requires your approval</div>
+              <div class="approval-digest">${escHtml(pending.actionDigest || 'Action details not available')}</div>
+              <div class="approval-buttons">
+                <button class="btn-success" onclick="decide('${taskId}','${pending.id}','APPROVE')">✓ Approve</button>
+                <button class="btn-reject" onclick="decide('${taskId}','${pending.id}','REJECT')">✗ Reject</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+  }
+
+  // Input card if needed
+  let inputHtml = '';
+  if (task.status === 'WAITING_INPUT') {
+    const lastAnswer = task.facts?.last_user_answer;
+    inputHtml = `
+      <div class="card">
+        <div class="card-header"><h2>❓ User Input Needed</h2></div>
+        <div class="card-body">
+          <div class="input-card">
+            <div class="input-title">The agent needs your help to continue</div>
+            <input id="userInput" type="text" placeholder="Type your response...">
+            <button class="btn btn-primary" onclick="submitInput('${taskId}')">Submit Answer</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Verification panel
+  let verifyHtml = '';
+  // (verification results shown via evidence + step feed)
+
+  // Facts
+  const factsHtml = Object.keys(task.facts || {}).length > 0
+    ? `<div class="fact-grid">${Object.entries(task.facts).map(([k,v]) =>
+        `<div class="fact-item"><div class="fact-key">${escHtml(k)}</div><div class="fact-val">${escHtml(String(v).substring(0,120))}</div></div>`
+      ).join('')}</div>`
+    : '<p style="color:#718096;font-size:13px;">No facts discovered yet</p>';
+
+  // Steps
+  const steps = task.steps || [];
+
+  content.innerHTML = `
+    <!-- Task Header -->
+    <div class="card">
+      <div class="card-header">
+        <h2 style="font-size:16px;max-width:80%;">${escHtml(task.request)}</h2>
+        <span class="status-badge status-${task.status}">${isRunning ? '<span class="spinner"></span> ' : ''}${task.status}</span>
+      </div>
+      <div class="card-body">
+        ${task.objective ? `<p style="color:#a0aec0;font-size:13px;margin-bottom:12px;">📎 ${escHtml(task.objective)}</p>` : ''}
+        <div style="display:flex;gap:16px;font-size:12px;color:#718096;">
+          <span>Steps: <strong style="color:#e2e8f0">${task.stepCount}</strong></span>
+          <span>Replans: <strong style="color:#e2e8f0">${task.replanCount}</strong></span>
+          <span>Started: <strong style="color:#e2e8f0">${new Date(task.createdAt).toLocaleTimeString()}</strong></span>
+        </div>
+        ${task.status !== 'COMPLETED' && task.status !== 'CANCELLED' ? 
+          `<button class="btn btn-danger" style="width:auto;padding:6px 14px;margin-top:12px;font-size:12px;" onclick="cancelTask('${taskId}')">Cancel</button>` : ''}
+      </div>
+    </div>
+
+    ${approvalHtml}
+    ${inputHtml}
+
+    <!-- Live step feed -->
+    <div class="card">
+      <div class="card-header"><h2>📡 Live Step Feed</h2></div>
+      <div class="card-body">
+        <div class="feed" id="stepFeed">
+          ${steps.map(s => `
+            <div class="feed-item ${s.failed?'FAILED':''}">
+              <span class="feed-icon">${s.failed?'❌':'✅'}</span>
+              <div class="feed-content">
+                <div class="feed-type">${escHtml(s.tool)} ${s.recovery ? '→ '+s.recovery : ''}</div>
+                <div class="feed-msg">${escHtml(s.summary)}</div>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Discovered facts -->
+    <div class="card">
+      <div class="card-header"><h2>🧠 Discovered Facts</h2></div>
+      <div class="card-body">${factsHtml}</div>
+    </div>
+  `;
+
+  // Refresh task list too
+  await loadTasks();
+}
+
+// ── Refresh task ──────────────────────────────────────────
+async function refreshTask(id) {
+  if (id === selectedTaskId) await renderTaskDetail(id);
+}
+
+// ── Load all tasks ─────────────────────────────────────────
+async function loadTasks() {
+  const list = await api('GET', '/api/tasks').catch(() => []);
+  if (!list) return;
+  const container = document.getElementById('taskList');
+  container.innerHTML = list.map(t => `
+    <div class="task-item ${t.id === selectedTaskId ? 'active' : ''}" data-id="${t.id}" onclick="selectTask('${t.id}')">
+      <div class="task-req">${escHtml(t.request)}</div>
+      <div class="task-meta">
+        <span class="status-badge status-${t.status}">${t.status}</span>
+        <span>Steps: ${t.stepCount}</span>
+      </div>
+    </div>`).join('');
+}
+
+// ── API helper ────────────────────────────────────────────
+async function api(method, url, body) {
+  try {
+    const opts = { method, headers: {'Content-Type':'application/json'} };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(url, opts);
+    if (!res.ok && res.status !== 404) console.error('API error', res.status, url);
+    if (res.status === 404) return null;
+    const text = await res.text();
+    return text ? JSON.parse(text) : null;
+  } catch (e) {
+    console.error('API error:', e);
+    return null;
+  }
+}
+
+function escHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──────────────────────────────────────────────────
+loadTasks();
+setInterval(loadTasks, 5000); // poll task list every 5s
+</script>
+</body>
+</html>
